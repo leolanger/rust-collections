@@ -48,7 +48,7 @@ impl Drop for List {
 }
 
 mod test {
-    use super::*;
+    use super::List;
 
     #[test]
     fn basic() {
