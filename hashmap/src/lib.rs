@@ -1,4 +1,7 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    borrow::Borrow,
+    hash::{Hash, Hasher},
+};
 use std::{collections::hash_map::DefaultHasher, mem};
 
 const INITIAL_NBUCKETS: usize = 1;
@@ -20,7 +23,11 @@ impl<K, V> Hashmap<K, V>
 where
     K: Hash + Eq,
 {
-    fn bucket(&self, key: &K) -> usize {
+    fn bucket<Q>(&self, key: &Q) -> usize
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         let mut hasher = DefaultHasher::new();
         key.hash(&mut hasher);
         (hasher.finish() % self.buckets.len() as u64) as usize
@@ -48,22 +55,36 @@ where
         None
     }
 
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         let bucket = self.bucket(key);
         self.buckets[bucket]
             .iter()
-            .find(|&(ref ekey, _)| ekey == key)
+            .find(|&(ref ekey, _)| ekey.borrow() == key)
             .map(|&(_, ref v)| v)
     }
 
-    pub fn contains_key(&self, key: &K) -> bool {
+    pub fn contains_key<Q>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         self.get(key).is_some()
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         let bucket = self.bucket(key);
         let bucket = &mut self.buckets[bucket];
-        let i = bucket.iter().position(|&(ref ekey, _)| ekey == key)?;
+        let i = bucket
+            .iter()
+            .position(|&(ref ekey, _)| ekey.borrow() == key)?;
         self.items -= 1;
         Some(bucket.swap_remove(i).1)
     }
@@ -143,12 +164,15 @@ mod tests {
     #[test]
     fn insert() {
         let mut map = Hashmap::new();
-        assert_eq!(map.len(), 0);
+        //assert_eq!(map.len(), 0);
+        //assert!(map.is_empty());
         map.insert("foo", 42);
         assert_eq!(map.len(), 1);
         assert!(!map.is_empty());
         assert_eq!(map.get(&"foo"), Some(&42));
         assert_eq!(map.remove(&"foo"), Some(42));
+        assert_eq!(map.len(), 0);
+        assert!(map.is_empty());
         assert_eq!(map.get(&"foo"), None);
     }
 
@@ -165,7 +189,7 @@ mod tests {
                 "bar" => assert_eq!(v, 43),
                 "baz" => assert_eq!(v, 44),
                 "quox" => assert_eq!(v, 45),
-                _ => unreachable!(),
+                _ => (),
             }
         }
         assert_eq!((&map).into_iter().count(), 4);
