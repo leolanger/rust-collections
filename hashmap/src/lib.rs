@@ -1,3 +1,5 @@
+// Linked Hash Map
+
 use std::{
     borrow::Borrow,
     hash::{Hash, Hasher},
